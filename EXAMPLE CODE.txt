@@ -1,0 +1,48 @@
+using System.Environment.CommandLine
+
+using System.Environment.CommandLineArgs
+
+ string[] args = System.Environment.GetCommandLineArgs ();
+ string input = "";
+ for (int i = 0; i < args.Length; i++) {
+     Debug.Log ("ARG " + i + ": " + args [i]);
+     if (args [i] == "-folderInput") {
+         input = args [i + 1];
+     }
+ }
+
+=================
+
+path = System.IO.Directory.GetCurrentDirectory(); //This gives the projects path
+
+====================
+
+ path = Application.dataPath;
+    if (Application.platform == RuntimePlatform.OSXPlayer) {
+        path += "/../../";
+    }
+    else if (Application.platform == RuntimePlatform.WindowsPlayer) {
+        path += "/../";
+    }
+=======================
+ Path.GetDirectoryName(Application.dataPath)
+=====================
+
+string file = object_of_type_in_application_assembly.GetType().Assembly.Location; string app = System.IO.Path.GetFileNameWithoutExtension( file ); 
+=====================
+
+
+System.AppDomain.CurrentDomain.FriendlyName - Returns the filename with extension (e.g. MyApp.exe).
+
+System.Diagnostics.Process.GetCurrentProcess().ProcessName - Returns the filename without extension (e.g. MyApp).
+
+System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName
+
+=============================
+
+ void LoadYourPhysicsProgram() {
+   ProcessStartInfo startInfo = new ProcessStartInfo();
+   startInfo.FileName = "PHYSICSPROGRAM.EXE";
+   StartInfo.Arguments = "Extra Arguments to Pass to the Program";
+   Process.Start(startInfo);
+ }
