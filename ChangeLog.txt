@@ -1,5 +1,14 @@
 #### Changelog
 
+1.1.3
+	Added code to exit the game (and restart) if any DLLs are renamed
+	Added window to give a 15 second windows to show what's going on
+	Added new restart option to settings to control if game should restart or not
+		Note:  If restarting, the option "-single-instance" will be stripped from the command
+				line arguments, otherwise KSP itself will not allow a restart
+	Added log.cs for local log control
+	Added logging to <GAMEDIR>/Log/ZeroMiniAVC.log
+
 1.1.2.5
 	Thanks to @Hebarusan for this:
 		Limit duplicate DLL warning to affected game versions.

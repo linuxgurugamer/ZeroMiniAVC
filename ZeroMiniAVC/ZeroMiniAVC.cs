@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 using System.IO;
 using System.Collections.Generic;
 using UnityEngine;
+using System.Diagnostics;
 
 namespace ZeroMiniAVC
 {
@@ -38,7 +39,13 @@ namespace ZeroMiniAVC
         bool prune = true;
         bool delete = false;
         bool noMessage = false;
+        bool restart = true;
 
+        bool prunedOrDeleted = false;
+        bool exitCountdownActive = false;
+        double countdownStartTime;
+
+        Log log;
         ConfigNode loadConfig()
         {
             ConfigNode[] _nodes = GameDatabase.Instance.GetConfigNodes(cfgNode);
@@ -61,6 +68,10 @@ namespace ZeroMiniAVC
                 {
                     noMessage = bool.Parse(_node.GetValue("noMessage"));
                 }
+                if (_node.HasValue("restart"))
+                {
+                    restart = bool.Parse(_node.GetValue("restart"));
+                }
                 return _node;
             }
             return new ConfigNode();
@@ -80,18 +91,59 @@ namespace ZeroMiniAVC
                 Destroy(this);
                 return;
             }
+            log = new Log("ZeroMiniAVC", Log.LEVEL.INFO);
+            var t = System.DateTime.Now;
+            log.Info("=================================================");
+            log.Info("ZeroMiniAVC started at: " + t.ToString());
+
             Instance = this;
             DontDestroyOnLoad(Instance);
             configPath = KSPUtil.ApplicationRootPath + "GameData/ZeroMiniAVC/Config.cfg";
             config = loadConfig();
-            Debug.Log("ZeroMiniAVC: Awake");
+            DontDestroyOnLoad(this);
+            log.Info("ZeroMiniAVC: Awake");
+        }
+
+        string[] args = null;
+        void GetCLIParams()
+        {
+            args = System.Environment.GetCommandLineArgs();
+            for (int i = 0; i < args.Length; i++)
+            {
+                log.Info("Arg[" + i + "]: " + args[i]);
+            }
+        }
+
+
+
+        void StartNewGame()
+        {
+            if (!restart)
+                return;
+            ProcessStartInfo startInfo = new ProcessStartInfo();
+            startInfo.FileName = args[0];
+            startInfo.Arguments = "";
+            for (int i = 1; i < args.Length; i++)
+            {
+                if (args[i].ToLower() != "-single-instance")
+                    startInfo.Arguments += args[i];
+                if (i < args.Length - 1)
+                    startInfo.Arguments += " ";
+            }
+
+            log.Info("startInfo.FileName: " + startInfo.FileName +
+                ", startInfo.Arguments: " + startInfo.Arguments);
+            Process.Start(startInfo);
+
         }
 
         void Start()
         {
+            GetCLIParams();
+
             if (disabled)
             {
-                Debug.LogWarning("ZeroMiniAVC: Disabled ... destroy.");
+                log.Info("Disabled ... destroy.");
                 Destroy(this);
                 return;
             }
@@ -112,9 +164,113 @@ namespace ZeroMiniAVC
             ConfigNode _config = new ConfigNode();
             _config.AddNode(config);
             _config.Save(configPath);
+            if (prunedOrDeleted)
+            {
+#if false
+                ShowWarning();
+#endif
 
-            screenMsg("ZeroMiniAVC destroyed...");
-            Destroy(this);
+                showWin = true;
+                exitCountdownActive = true;
+                countdownStartTime = Time.realtimeSinceStartup;
+            }
+            else
+            {
+                screenMsg("ZeroMiniAVC destroyed...");
+                Destroy(this);
+            }
+        }
+
+#if false
+        private PopupDialog popup;
+
+        public void ShowWarning()
+        {
+            exitCountdownActive = true;
+            countdownStartTime = Time.realtimeSinceStartup;
+
+            InputLockManager.SetControlLock(ControlTypes.All, "ZeroMiniAVC");
+            string
+                dialogMsg = "One or more MiniAVC.dll files have been detected and pruned.  The game needs to be restarted to avoid potential problems, and will restart in 15 seconds";
+            if (restart)
+                dialogMsg += ".  The game will automatically restart after exiting";
+
+            log.Info(dialogMsg);
+            string windowTitle = "WARNING";
+
+            DialogGUIBase[] options =
+            {
+                new DialogGUIButton("Press to exit"+ (restart?" and restart":""), OkToExit)
+            };
+
+            MultiOptionDialog confirmationBox = new MultiOptionDialog("ZeroMiniAVC", dialogMsg, windowTitle, HighLogic.UISkin, options);
+
+            popup = PopupDialog.SpawnPopupDialog(confirmationBox, false, HighLogic.UISkin);
+        }
+#endif
+        bool showWin = false;
+        Rect winRect = new Rect(0, 0, 450, 150);
+        void OnGUI()
+        {
+            if (showWin)
+            {
+                GUI.skin = HighLogic.Skin;
+                winRect.x = (Screen.width - winRect.width) / 2;
+                winRect.y = (Screen.height - winRect.height) / 2;
+
+                InputLockManager.SetControlLock(ControlTypes.All, "ZeroMiniAVC");
+
+                winRect = GUILayout.Window(939387374, winRect, WarnWin, "ZeroMiniAVC Restart");
+            }
+        }
+
+        void WarnWin(int i)
+        {
+            var now = Time.realtimeSinceStartup;
+            int timeLeft = 15 - (int)(now - countdownStartTime);
+
+            GUILayout.BeginVertical();
+            GUILayout.Label("One or more MiniAVC.dll files have been detected and pruned.");
+            GUILayout.Label("The game needs to be restarted to avoid potential problems,");
+            GUILayout.Label("and will restart in " + timeLeft + " seconds");
+            GUILayout.Space(20);
+            if (restart)
+                GUILayout.Label("The game will automatically restart after exiting");
+
+
+            GUILayout.Space(20);
+            GUILayout.BeginHorizontal();
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button("Exit Game now" + (restart ? " and Restart" : ""), GUILayout.Width(250)))
+            {
+                OkToExit();
+            }
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+            GUILayout.EndVertical();
+
+        }
+
+        bool newgameStarted = false;
+        public void OkToExit()
+        {
+            if (!newgameStarted)
+            {
+                newgameStarted = true;
+                StartNewGame();
+            }
+            Application.Quit();
+        }
+
+        void FixedUpdate()
+        {
+            if (prunedOrDeleted && exitCountdownActive)
+            {
+                InputLockManager.SetControlLock(ControlTypes.All, "ZeroMiniAVC");
+                var now = Time.realtimeSinceStartup;
+                if (now - countdownStartTime > 15)
+                    OkToExit();
+            }
         }
 
         void DoCleanup(string path)
@@ -132,11 +288,14 @@ namespace ZeroMiniAVC
                 _cfgMod.AddValue("name", _mod);
                 _cfgMod.AddValue("pruned", _prunePath);
                 screenMsg("MiniAVC pruned for " + _mod);
+                log.Info("MiniAVC pruned for " + _mod + ", path: " + _prunePath);
+                prunedOrDeleted = true;
             }
             else if (delete)
             {
                 File.Delete(path);
                 screenMsg("MiniAVC deleted for " + _mod);
+                prunedOrDeleted = true;
             }
             else
             {
@@ -144,6 +303,7 @@ namespace ZeroMiniAVC
             }
 
         }
+
         void cleanMiniAVC()
         {
             AssemblyLoader.LoadedAssembyList _assemblies = AssemblyLoader.loadedAssemblies;
@@ -151,7 +311,9 @@ namespace ZeroMiniAVC
             {
                 AssemblyLoader.LoadedAssembly _assembly = _assemblies[_i];
 
-                if (_assembly.name.ToLower() == "miniavc")
+                if ((_assembly.name.ToLower().Contains("miniavc") || _assembly.name.ToLower().Contains("miniavc-v2")) &&
+                    !_assembly.name.ToLower().Contains("zerominiavc"))
+
                 {
                     _assembly.Unload();
                     AssemblyLoader.loadedAssemblies.RemoveAt(_i);
@@ -185,8 +347,8 @@ namespace ZeroMiniAVC
             var files = Directory.GetFiles(dir, "*.dll", SearchOption.AllDirectories);
             foreach (var f in files)
             {
-                if ((f.ToLower().Contains("miniavc.dll") || f.ToLower().Contains("miniavc-v2.dll"))&&
-                    !f.ToLower().Contains("zerominiavc.dll"))
+                if ((f.ToLower().Contains("miniavc.dll") || f.ToLower().Contains("miniavc-v2.dll")) &&
+                    !f.ToLower().Contains("zerominiavc"))
                 {
                     DoCleanup(f);
                 }
@@ -196,7 +358,7 @@ namespace ZeroMiniAVC
                     {
                         if (Path.GetFileName(f) != "KSP-AVC.dll")
                         {
-                            Debug.Log("Duplicate DLLs found: " + installedDlls[Path.GetFileName(f)] + " : " + f);
+                            log.Info("Duplicate DLLs found: " + installedDlls[Path.GetFileName(f)] + " : " + f);
                             duplicateDlls.Add(f);
                             if (!duplicateDlls.Contains(installedDlls[Path.GetFileName(f)]))
                                 duplicateDlls.Add(installedDlls[Path.GetFileName(f)]);
@@ -241,7 +403,7 @@ namespace ZeroMiniAVC
 
         void screenMsg(string msg)
         {
-            Debug.LogWarning(msg);
+            log.Info(msg);
             if (noMessage)
             {
                 return;
@@ -259,7 +421,7 @@ namespace MiniAVC
     {
         void Awake()
         {
-            Debug.Log("MiniAVC.Logger: Destroy");
+            UnityEngine.Debug.Log("MiniAVC.Logger: Destroy");
             Destroy(this);
         }
     }
@@ -267,7 +429,7 @@ namespace MiniAVC
     {
         void Awake()
         {
-            Debug.Log("MiniAVC.Starter: Destroy");
+            UnityEngine.Debug.Log("MiniAVC.Starter: Destroy");
             Destroy(this);
         }
     }
