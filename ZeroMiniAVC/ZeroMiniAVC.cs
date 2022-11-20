@@ -169,7 +169,7 @@ namespace ZeroMiniAVC
 #if false
                 ShowWarning();
 #endif
-
+                log.Info("showwin set to true");
                 showWin = true;
                 exitCountdownActive = true;
                 countdownStartTime = Time.realtimeSinceStartup;
@@ -307,17 +307,32 @@ namespace ZeroMiniAVC
         void cleanMiniAVC()
         {
             AssemblyLoader.LoadedAssembyList _assemblies = AssemblyLoader.loadedAssemblies;
+            log.Info("cleanMiniAVC");
+            bool cleanupDone = false;
             for (int _i = _assemblies.Count - 1; _i >= 0; --_i)
             {
                 AssemblyLoader.LoadedAssembly _assembly = _assemblies[_i];
 
                 if ((_assembly.name.ToLower().Contains("miniavc") || _assembly.name.ToLower().Contains("miniavc-v2")) &&
                     !_assembly.name.ToLower().Contains("zerominiavc"))
-
                 {
                     _assembly.Unload();
                     AssemblyLoader.loadedAssemblies.RemoveAt(_i);
                     DoCleanup(_assembly.path);
+                    cleanupDone = true;
+                }
+            }
+            // From KSP 1.12.3 onward, it only loaded a single DLL of each type. so if there were multiple DLLs in 
+            // the game with the same name, it would only load the newest.  Good news is that after the step above, 
+            // any others found will not be loaded and can be simply pruned
+            if (cleanupDone)
+            {
+                var parentDirectory = KSPUtil.ApplicationRootPath;
+
+                foreach (string file in System.IO.Directory.GetFiles(parentDirectory, "MiniAVC.dll", SearchOption.AllDirectories))
+                {
+                    log.Info("Unloaded MiniAVC.dll file found: " + file);
+                    DoCleanup(file);
                 }
             }
         }

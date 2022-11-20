@@ -9,6 +9,8 @@ rem    but not always
 
 set H=%KSPDIR%
 
+set H=R:\KSP_1.12.4_MissionCtlrParallax
+
 set GAMEDIR=ZeroMiniAVC
 set GAMEDATA="GameData"
 set VERSIONFILE=%GAMEDIR%.version
