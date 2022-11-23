@@ -210,24 +210,47 @@ namespace ZeroMiniAVC
 #endif
         bool showWin = false;
         Rect winRect = new Rect(0, 0, 450, 150);
+        const int COUNTDOWN = 30;
+        bool initted = false;
+        GUIStyle window;
+
         void OnGUI()
         {
             if (showWin)
             {
+                if (!initted)
+                {
+                    GUI.color = Color.grey;
+                    window = new GUIStyle(HighLogic.Skin.window);
+                    //window.normal.background.SetPixels( new[] { new Color(0.5f, 0.5f, 0.5f, 1f) });
+                    window.active.background = window.normal.background;
+
+                    Texture2D tex = window.normal.background; //.CreateReadable();
+                    var pixels = tex.GetPixels32();
+
+                    for (int i = 0; i < pixels.Length; ++i)
+                        pixels[i].a = 255;
+
+                    tex.SetPixels32(pixels); tex.Apply();
+                    window.active.background =
+                    window.focused.background =
+                    window.normal.background = tex;
+
+                }
                 GUI.skin = HighLogic.Skin;
                 winRect.x = (Screen.width - winRect.width) / 2;
                 winRect.y = (Screen.height - winRect.height) / 2;
 
                 InputLockManager.SetControlLock(ControlTypes.All, "ZeroMiniAVC");
 
-                winRect = GUILayout.Window(939387374, winRect, WarnWin, "ZeroMiniAVC Restart");
+                winRect = GUILayout.Window(939387374, winRect, WarnWin, "ZeroMiniAVC Restart", window);
             }
         }
 
         void WarnWin(int i)
         {
             var now = Time.realtimeSinceStartup;
-            int timeLeft = 15 - (int)(now - countdownStartTime);
+            int timeLeft = COUNTDOWN - (int)(now - countdownStartTime);
 
             GUILayout.BeginVertical();
             GUILayout.Label("One or more MiniAVC.dll files have been detected and pruned.");
@@ -268,7 +291,7 @@ namespace ZeroMiniAVC
             {
                 InputLockManager.SetControlLock(ControlTypes.All, "ZeroMiniAVC");
                 var now = Time.realtimeSinceStartup;
-                if (now - countdownStartTime > 15)
+                if (now - countdownStartTime > COUNTDOWN)
                     OkToExit();
             }
         }
@@ -333,6 +356,19 @@ namespace ZeroMiniAVC
                 {
                     log.Info("Unloaded MiniAVC.dll file found: " + file);
                     DoCleanup(file);
+                }
+                // Following added for Mac & Linux, since they have case sensitive file names
+                if (!System.Runtime.InteropServices.RuntimeInformation
+                                               .IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
+                {
+                    foreach (string file in System.IO.Directory.GetFiles(parentDirectory, "*", SearchOption.AllDirectories))
+                    {
+                        if (file.ToLower().Contains("miniavc.dll"))
+                        {
+                            log.Info("Unloaded MiniAVC.dll file found: " + file);
+                            DoCleanup(file);
+                        }
+                    }
                 }
             }
         }
